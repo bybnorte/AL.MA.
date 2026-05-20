@@ -1,0 +1,9 @@
+{
+  "proveedor_ia": "ollama",
+  "modelo_local": "llama3.2",
+  "claude_api_key": "",
+  "gemini_api_key": "",
+  "openai_api_key": "",
+  "puerto": 5000,
+  "capturar_pantalla_auto": false
+}

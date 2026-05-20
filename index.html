@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AL.MA — Asistente Personal</title>
+    <style>
+        :root {
+            --bg:       #06080f;
+            --bg2:      #0b0e1a;
+            --bg3:      #0f1525;
+            --azul:     #4a9eff;
+            --azul2:    #2563eb;
+            --glow:     rgba(74,158,255,0.55);
+            --glow2:    rgba(74,158,255,0.12);
+            --texto:    #ccd8f0;
+            --texto2:   #8099c0;
+            --borde:    #1a2240;
+            --verde:    #22c55e;
+            --rojo:     #ef4444;
+            --naranja:  #f59e0b;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',system-ui,sans-serif; }
+
+        body { background:var(--bg); color:var(--texto); display:flex; height:100vh; overflow:hidden; }
+
+        /* ── SIDEBAR ── */
+        .sidebar {
+            width:260px; min-width:260px; background:var(--bg2);
+            border-right:1px solid var(--borde);
+            display:flex; flex-direction:column; padding:16px; z-index:10;
+            transition:transform .3s;
+        }
+        .logo-wrap { display:flex; align-items:center; gap:12px; padding:8px 0 16px; border-bottom:1px solid var(--borde); }
+        #canvasLogo { width:54px; height:54px; flex-shrink:0; }
+        .logo-text  { font-size:1.4rem; font-weight:800; color:var(--azul); letter-spacing:3px; text-shadow:0 0 14px var(--glow); }
+        .logo-sub   { font-size:0.65rem; color:var(--texto2); letter-spacing:2px; margin-top:2px; }
+
+        .nav { margin-top:18px; display:flex; flex-direction:column; gap:6px; }
+        .nav-item {
+            padding:10px 14px; border-radius:8px; cursor:pointer; font-size:.9rem;
+            display:flex; align-items:center; gap:10px; color:var(--texto2);
+            transition:all .2s; border:1px solid transparent;
+        }
+        .nav-item:hover { background:var(--glow2); color:var(--texto); }
+        .nav-item.active { background:var(--glow2); color:var(--azul); border-color:rgba(74,158,255,.2); }
+        .nav-icon { font-size:1rem; width:20px; text-align:center; }
+
+        /* Status en sidebar */
+        .status-bar {
+            margin-top:auto; padding:12px; border-radius:8px;
+            background:var(--bg3); border:1px solid var(--borde);
+            font-size:.75rem; color:var(--texto2);
+        }
+        .status-dot {
+            display:inline-block; width:8px; height:8px; border-radius:50%;
+            margin-right:6px; background:var(--rojo); transition:background .4s;
+        }
+        .status-dot.online { background:var(--verde); box-shadow:0 0 6px var(--verde); }
+        .proveedor-badge {
+            margin-top:6px; padding:3px 8px; background:var(--bg2);
+            border-radius:4px; font-size:.7rem; color:var(--azul); display:inline-block;
+        }
+
+        /* ── MAIN ── */
+        .main { flex:1; display:flex; flex-direction:column; min-width:0; }
+
+        /* Header */
+        .header {
+            height:54px; border-bottom:1px solid var(--borde);
+            display:flex; align-items:center; justify-content:space-between;
+            padding:0 20px; background:var(--bg2); flex-shrink:0;
+        }
+        .header-title { font-size:.95rem; color:var(--texto2); letter-spacing:1px; }
+        .btn-hamburger {
+            display:none; background:none; border:none; color:var(--azul);
+            font-size:1.4rem; cursor:pointer; padding:4px 8px;
+        }
+
+        /* ── VISTAS ── */
+        .vista { flex:1; display:none; flex-direction:column; overflow:hidden; }
+        .vista.activa { display:flex; }
+
+        /* ─── CHAT ─── */
+        #vistaChat { position:relative; }
+        #canvasOnda { position:absolute; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; }
+
+        .mensajes {
+            flex:1; overflow-y:auto; padding:20px; display:flex;
+            flex-direction:column; gap:14px; z-index:1; position:relative;
+        }
+        .mensajes::-webkit-scrollbar { width:4px; }
+        .mensajes::-webkit-scrollbar-thumb { background:var(--borde); border-radius:4px; }
+
+        .burbuja {
+            max-width:78%; padding:12px 16px; border-radius:14px;
+            font-size:.9rem; line-height:1.6; word-break:break-word;
+            animation:fadeIn .25s ease;
+        }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+        .burbuja.user {
+            align-self:flex-end; background:var(--azul2);
+            color:#fff; border-bottom-right-radius:4px;
+        }
+        .burbuja.alma {
+            align-self:flex-start; background:var(--bg3);
+            border:1px solid var(--borde); border-bottom-left-radius:4px;
+        }
+        .burbuja-meta {
+            font-size:.68rem; color:var(--texto2); margin-top:5px;
+            display:flex; gap:8px; align-items:center;
+        }
+        .badge {
+            padding:2px 6px; border-radius:4px; background:var(--bg2);
+            border:1px solid var(--borde); font-size:.63rem;
+        }
+        .badge.claude  { color:#c084fc; border-color:#c084fc44; }
+        .badge.gemini  { color:#34d399; border-color:#34d39944; }
+        .badge.openai  { color:#fbbf24; border-color:#fbbf2444; }
+        .badge.ollama  { color:var(--azul); border-color:rgba(74,158,255,.3); }
+        .badge.web     { color:var(--verde); }
+        .badge.mem     { color:var(--naranja); }
+
+        .typing { align-self:flex-start; display:flex; gap:5px; padding:12px 16px;
+                  background:var(--bg3); border:1px solid var(--borde); border-radius:14px; border-bottom-left-radius:4px; }
+        .typing span { width:7px; height:7px; background:var(--azul); border-radius:50%;
+                       animation:bounce 1.2s infinite; }
+        .typing span:nth-child(2){ animation-delay:.2s; }
+        .typing span:nth-child(3){ animation-delay:.4s; }
+        @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-8px)} }
+
+        /* Input */
+        .input-area {
+            padding:14px 20px; border-top:1px solid var(--borde);
+            background:var(--bg2); z-index:2; flex-shrink:0;
+        }
+        .input-row { display:flex; gap:8px; align-items:center; }
+        .input-box {
+            flex:1; display:flex; align-items:center;
+            background:var(--bg3); border:1px solid var(--borde);
+            border-radius:26px; padding:4px 8px 4px 16px;
+            transition:border-color .2s, box-shadow .2s;
+        }
+        .input-box:focus-within { border-color:rgba(74,158,255,.5); box-shadow:0 0 16px rgba(74,158,255,.1); }
+        .input-box input {
+            flex:1; background:none; border:none; outline:none;
+            color:var(--texto); font-size:.92rem; padding:10px 4px;
+        }
+        .input-box input::placeholder { color:var(--texto2); }
+        .btn-icon {
+            background:none; border:none; color:var(--azul); cursor:pointer;
+            padding:8px; font-size:1.1rem; border-radius:50%; transition:all .2s;
+        }
+        .btn-icon:hover { background:var(--glow2); transform:scale(1.1); }
+        .btn-send {
+            width:42px; height:42px; border-radius:50%;
+            background:var(--azul2); border:none; color:#fff;
+            cursor:pointer; font-size:1rem; display:flex; align-items:center;
+            justify-content:center; transition:all .2s; flex-shrink:0;
+        }
+        .btn-send:hover { background:var(--azul); box-shadow:0 0 14px var(--glow); }
+        .btn-send:disabled { opacity:.4; cursor:default; }
+
+        /* ─── MEMORIA ─── */
+        #vistaMemoria { padding:20px; overflow-y:auto; }
+        #vistaMemoria::-webkit-scrollbar { width:4px; }
+        #vistaMemoria::-webkit-scrollbar-thumb { background:var(--borde); border-radius:4px; }
+        .mem-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+        .mem-header h2 { font-size:1rem; color:var(--azul); }
+        .mem-search {
+            background:var(--bg3); border:1px solid var(--borde); border-radius:8px;
+            padding:7px 12px; color:var(--texto); outline:none; font-size:.85rem; width:220px;
+        }
+        .mem-search:focus { border-color:rgba(74,158,255,.5); }
+        .mem-add-form {
+            display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;
+        }
+        .mem-input {
+            flex:1; min-width:120px; background:var(--bg3); border:1px solid var(--borde);
+            border-radius:8px; padding:8px 12px; color:var(--texto); font-size:.85rem; outline:none;
+        }
+        .mem-input:focus { border-color:rgba(74,158,255,.5); }
+        .btn-primary {
+            padding:8px 16px; background:var(--azul2); color:#fff; border:none;
+            border-radius:8px; cursor:pointer; font-size:.85rem; transition:background .2s;
+        }
+        .btn-primary:hover { background:var(--azul); }
+        .mem-grid { display:flex; flex-direction:column; gap:8px; }
+        .mem-card {
+            background:var(--bg3); border:1px solid var(--borde); border-radius:10px;
+            padding:12px 14px; display:flex; justify-content:space-between; align-items:flex-start; gap:10px;
+        }
+        .mem-card-body { flex:1; }
+        .mem-clave { font-size:.75rem; color:var(--azul); font-weight:600; margin-bottom:4px; }
+        .mem-contenido { font-size:.85rem; line-height:1.5; color:var(--texto); }
+        .mem-fecha { font-size:.68rem; color:var(--texto2); margin-top:4px; }
+        .btn-del { background:none; border:none; color:var(--rojo); cursor:pointer; font-size:1rem; opacity:.6; transition:opacity .2s; }
+        .btn-del:hover { opacity:1; }
+
+        /* ─── BÚSQUEDA ─── */
+        #vistaBusqueda { padding:20px; overflow-y:auto; }
+        .search-big-wrap { display:flex; gap:8px; margin-bottom:20px; }
+        .search-big {
+            flex:1; background:var(--bg3); border:1px solid var(--borde);
+            border-radius:12px; padding:12px 18px; color:var(--texto);
+            font-size:1rem; outline:none;
+        }
+        .search-big:focus { border-color:rgba(74,158,255,.5); }
+        .search-result {
+            background:var(--bg3); border:1px solid var(--borde); border-radius:10px;
+            padding:16px; font-size:.88rem; line-height:1.7; white-space:pre-wrap; color:var(--texto);
+        }
+
+        /* ─── CONTROL ─── */
+        #vistaControl { padding:20px; overflow-y:auto; }
+        #vistaControl h2 { color:var(--azul); font-size:1rem; margin-bottom:16px; }
+        .control-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px; }
+        .ctrl-card {
+            background:var(--bg3); border:1px solid var(--borde); border-radius:10px;
+            padding:14px; cursor:pointer; transition:all .2s; text-align:center;
+        }
+        .ctrl-card:hover { border-color:rgba(74,158,255,.4); background:var(--glow2); }
+        .ctrl-card .ctrl-icon { font-size:1.8rem; margin-bottom:6px; }
+        .ctrl-card .ctrl-label { font-size:.8rem; color:var(--texto2); }
+        .ctrl-input-row { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+        #ctrlLog {
+            background:var(--bg3); border:1px solid var(--borde); border-radius:8px;
+            padding:12px; font-size:.8rem; color:var(--verde); font-family:monospace;
+            min-height:80px; max-height:200px; overflow-y:auto;
+        }
+
+        /* ─── CONFIG ─── */
+        #vistaConfig { padding:20px; overflow-y:auto; }
+        #vistaConfig h2 { color:var(--azul); font-size:1rem; margin-bottom:16px; }
+        .cfg-section { background:var(--bg3); border:1px solid var(--borde); border-radius:10px; padding:16px; margin-bottom:14px; }
+        .cfg-section h3 { font-size:.85rem; color:var(--texto2); margin-bottom:12px; letter-spacing:1px; text-transform:uppercase; }
+        .cfg-row { display:flex; flex-direction:column; gap:4px; margin-bottom:12px; }
+        .cfg-label { font-size:.8rem; color:var(--texto2); }
+        .cfg-input, .cfg-select {
+            background:var(--bg2); border:1px solid var(--borde); border-radius:8px;
+            padding:9px 12px; color:var(--texto); font-size:.88rem; outline:none; width:100%;
+        }
+        .cfg-input:focus, .cfg-select:focus { border-color:rgba(74,158,255,.5); }
+        .cfg-select option { background:var(--bg2); }
+        .cfg-note { font-size:.72rem; color:var(--texto2); margin-top:3px; }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width:700px) {
+            .sidebar { position:fixed; left:0; top:0; height:100%; transform:translateX(-100%); }
+            .sidebar.open { transform:translateX(0); box-shadow:4px 0 20px #000a; }
+            .btn-hamburger { display:block; }
+            .control-grid { grid-template-columns:1fr; }
+        }
+
+        .overlay {
+            display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:9;
+        }
+        .overlay.visible { display:block; }
+    </style>
+</head>
+<body>
+
+<div class="overlay" id="overlay" onclick="cerrarSidebar()"></div>
+
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+    <div class="logo-wrap">
+        <canvas id="canvasLogo" width="54" height="54"></canvas>
+        <div>
+            <div class="logo-text">AL.MA</div>
+            <div class="logo-sub">ASISTENTE PERSONAL</div>
+        </div>
+    </div>
+
+    <nav class="nav">
+        <div class="nav-item active" data-vista="vistaChat">
+            <span class="nav-icon">💬</span> Conversación
+        </div>
+        <div class="nav-item" data-vista="vistaMemoria">
+            <span class="nav-icon">🧠</span> Memoria
+        </div>
+        <div class="nav-item" data-vista="vistaBusqueda">
+            <span class="nav-icon">🔍</span> Búsqueda Web
+        </div>
+        <div class="nav-item" data-vista="vistaControl">
+            <span class="nav-icon">🖥️</span> Control
+        </div>
+        <div class="nav-item" data-vista="vistaConfig">
+            <span class="nav-icon">⚙️</span> Configuración
+        </div>
+    </nav>
+
+    <div class="status-bar">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusTexto">Verificando...</span>
+        <div class="proveedor-badge" id="proveedorBadge">—</div>
+    </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+    <div class="header">
+        <button class="btn-hamburger" onclick="abrirSidebar()">☰</button>
+        <span class="header-title" id="headerTitle">CONVERSACIÓN</span>
+        <span style="font-size:.75rem;color:var(--texto2)" id="headerHora"></span>
+    </div>
+
+    <!-- ─── CHAT ─── -->
+    <div class="vista activa" id="vistaChat">
+        <canvas id="canvasOnda"></canvas>
+        <div class="mensajes" id="mensajes"></div>
+        <div class="input-area">
+            <div class="input-row">
+                <div class="input-box">
+                    <button class="btn-icon" id="btnMic" title="Voz (toggle onda)">🎙️</button>
+                    <input type="text" id="inputMsg" placeholder="Escribe un mensaje..." autocomplete="off">
+                    <button class="btn-icon" id="btnPantalla" title="Adjuntar captura de pantalla">📷</button>
+                </div>
+                <button class="btn-send" id="btnSend" title="Enviar">➤</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── MEMORIA ─── -->
+    <div class="vista" id="vistaMemoria">
+        <div class="mem-header">
+            <h2>🧠 Memoria</h2>
+            <input class="mem-search" id="memSearch" placeholder="Buscar en memoria..." oninput="buscarEnMemoria(this.value)">
+        </div>
+        <div class="mem-add-form">
+            <input class="mem-input" id="memClave" placeholder="Clave (ej: trabajo_lunes)">
+            <input class="mem-input" id="memContenido" placeholder="Contenido a recordar..." style="flex:2">
+            <button class="btn-primary" onclick="agregarMemoria()">+ Guardar</button>
+        </div>
+        <div class="mem-grid" id="memGrid">
+            <div style="color:var(--texto2);text-align:center;padding:40px">Cargando memoria...</div>
+        </div>
+    </div>
+
+    <!-- ─── BÚSQUEDA ─── -->
+    <div class="vista" id="vistaBusqueda">
+        <div class="search-big-wrap">
+            <input class="search-big" id="searchInput" placeholder="¿Qué quieres buscar en Google?">
+            <button class="btn-primary" onclick="ejecutarBusqueda()">Buscar</button>
+        </div>
+        <div id="searchResultado" style="color:var(--texto2);font-size:.9rem">
+            Ingresa una consulta para buscar en la web.
+        </div>
+    </div>
+
+    <!-- ─── CONTROL ─── -->
+    <div class="vista" id="vistaControl">
+        <h2>🖥️ Control del Computador</h2>
+        <div class="control-grid">
+            <div class="ctrl-card" onclick="accionRapida('abrir_url','https://google.com')">
+                <div class="ctrl-icon">🌐</div><div class="ctrl-label">Abrir Google</div>
+            </div>
+            <div class="ctrl-card" onclick="accionRapida('abrir_url','https://mail.google.com')">
+                <div class="ctrl-icon">📧</div><div class="ctrl-label">Abrir Gmail</div>
+            </div>
+            <div class="ctrl-card" onclick="capturarPantalla()">
+                <div class="ctrl-icon">📸</div><div class="ctrl-label">Ver pantalla</div>
+            </div>
+            <div class="ctrl-card" onclick="accionRapida('tecla','win')">
+                <div class="ctrl-icon">🪟</div><div class="ctrl-label">Tecla Windows</div>
+            </div>
+        </div>
+
+        <div class="ctrl-input-row">
+            <select id="ctrlAccion" class="cfg-select" style="width:auto;flex:0 0 150px">
+                <option value="abrir_url">Abrir URL</option>
+                <option value="abrir_app">Abrir App</option>
+                <option value="escribir">Escribir texto</option>
+                <option value="tecla">Presionar tecla</option>
+                <option value="click">Click en X,Y</option>
+            </select>
+            <input class="mem-input" id="ctrlParam" placeholder="Parámetro (URL, nombre, texto...)">
+            <button class="btn-primary" onclick="ejecutarControl()">Ejecutar</button>
+        </div>
+
+        <div id="ctrlLog">> Listo.</div>
+
+        <div style="margin-top:16px">
+            <button class="btn-primary" onclick="capturarPantalla()" style="background:var(--bg3);border:1px solid var(--borde);color:var(--texto2)">
+                📸 Captura de pantalla
+            </button>
+        </div>
+        <img id="screenshotImg" style="display:none;max-width:100%;border-radius:8px;margin-top:12px;border:1px solid var(--borde)">
+    </div>
+
+    <!-- ─── CONFIG ─── -->
+    <div class="vista" id="vistaConfig">
+        <h2>⚙️ Configuración</h2>
+
+        <div class="cfg-section">
+            <h3>Proveedor de IA</h3>
+            <div class="cfg-row">
+                <label class="cfg-label">Proveedor principal</label>
+                <select class="cfg-select" id="cfgProveedor">
+                    <option value="ollama">Ollama (local, sin internet)</option>
+                    <option value="claude">Claude (Anthropic)</option>
+                    <option value="gemini">Gemini (Google)</option>
+                    <option value="openai">ChatGPT (OpenAI)</option>
+                </select>
+                <div class="cfg-note">Ollama siempre actúa como fallback si hay error o sin internet.</div>
+            </div>
+            <div class="cfg-row">
+                <label class="cfg-label">Modelo Ollama local</label>
+                <input class="cfg-input" id="cfgModelo" placeholder="llama3.2">
+            </div>
+        </div>
+
+        <div class="cfg-section">
+            <h3>API Keys</h3>
+            <div class="cfg-row">
+                <label class="cfg-label">Claude API Key</label>
+                <input class="cfg-input" id="cfgClaudeKey" type="password" placeholder="sk-ant-...">
+            </div>
+            <div class="cfg-row">
+                <label class="cfg-label">Gemini API Key</label>
+                <input class="cfg-input" id="cfgGeminiKey" type="password" placeholder="AIza...">
+            </div>
+            <div class="cfg-row">
+                <label class="cfg-label">OpenAI API Key</label>
+                <input class="cfg-input" id="cfgOpenaiKey" type="password" placeholder="sk-...">
+            </div>
+        </div>
+
+        <div class="cfg-section">
+            <h3>Servidor</h3>
+            <div class="cfg-row">
+                <label class="cfg-label">URL del backend (cambia si accedes desde móvil)</label>
+                <input class="cfg-input" id="cfgBaseUrl" placeholder="http://localhost:5000">
+                <div class="cfg-note">En móvil usa la IP local de tu computador (ej: http://192.168.1.100:5000)</div>
+            </div>
+        </div>
+
+        <button class="btn-primary" onclick="guardarConfig()" style="width:100%;padding:12px">
+            💾 Guardar configuración
+        </button>
+
+        <div id="cfgMsg" style="margin-top:10px;text-align:center;font-size:.85rem;color:var(--verde)"></div>
+    </div>
+</div><!-- /main -->
+
+<!-- ══════════════════════ SCRIPTS ══════════════════════ -->
+<script>
+// ── CONFIG LOCAL (URL base del servidor Flask) ─────────────────────
+let BASE_URL = localStorage.getItem('alma_base_url') || 'http://localhost:5000';
+let capturarPantallaPendiente = false;
+
+// ── LOGO ORBITAL ───────────────────────────────────────────────────
+(function(){
+    const c = document.getElementById('canvasLogo');
+    const ctx = c.getContext('2d');
+    const W=54,H=54,CX=27,CY=27;
+    let a=0;
+
+    function draw(){
+        ctx.clearRect(0,0,W,H);
+        // glow bg
+        const bg=ctx.createRadialGradient(CX,CY,1,CX,CY,24);
+        bg.addColorStop(0,'rgba(30,100,220,.2)'); bg.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+        // orbits
+        [[-.52],[0.52]].forEach(([rot])=>{
+            ctx.save(); ctx.translate(CX,CY); ctx.rotate(rot); ctx.scale(1,.38);
+            ctx.beginPath(); ctx.ellipse(0,0,22,22,0,0,Math.PI*2);
+            ctx.strokeStyle='rgba(80,160,255,.65)'; ctx.lineWidth=1.4/.38;
+            ctx.shadowColor='#4af'; ctx.shadowBlur=7; ctx.stroke(); ctx.restore();
+        });
+        // stars
+        [[CX,CY-25,2.2],[CX,CY+23,1.4]].forEach(([x,y,s])=>star4(ctx,x,y,s));
+        // nucleus
+        const g=ctx.createRadialGradient(CX-3,CY-3,1,CX,CY,13);
+        g.addColorStop(0,'rgba(160,215,255,1)'); g.addColorStop(.4,'rgba(50,120,230,.95)'); g.addColorStop(1,'rgba(5,25,90,.98)');
+        ctx.beginPath(); ctx.arc(CX,CY,13,0,Math.PI*2);
+        ctx.fillStyle=g; ctx.shadowColor='#3af'; ctx.shadowBlur=18; ctx.fill(); ctx.shadowBlur=0;
+        // specular
+        const sp=ctx.createRadialGradient(CX-4,CY-4,0,CX-3,CY-3,5);
+        sp.addColorStop(0,'rgba(220,240,255,.55)'); sp.addColorStop(1,'rgba(220,240,255,0)');
+        ctx.beginPath(); ctx.arc(CX,CY,13,0,Math.PI*2); ctx.fillStyle=sp; ctx.fill();
+        // satellites
+        [[-.52,a,4.5],[0.52,a+Math.PI,3.8]].forEach(([rot,ang,r])=>{
+            const x0=Math.cos(ang)*22, y0=Math.sin(ang)*22*.38;
+            const co=Math.cos(rot),si=Math.sin(rot);
+            sat(ctx, CX+x0*co-y0*si, CY+x0*si+y0*co, r);
+        });
+        a+=.022; requestAnimationFrame(draw);
+    }
+    function sat(c,x,y,r){
+        const g=c.createRadialGradient(x-r*.35,y-r*.35,.4,x,y,r);
+        g.addColorStop(0,'rgba(200,230,255,1)'); g.addColorStop(.5,'rgba(60,140,240,.9)'); g.addColorStop(1,'rgba(10,50,150,.9)');
+        c.beginPath(); c.arc(x,y,r,0,Math.PI*2);
+        c.fillStyle=g; c.shadowColor='#5bf'; c.shadowBlur=10; c.fill(); c.shadowBlur=0;
+    }
+    function star4(c,x,y,s){
+        c.fillStyle='rgba(150,210,255,.9)'; c.shadowColor='#9df'; c.shadowBlur=8;
+        c.fillRect(x-s*.18,y-s,s*.36,s*2); c.fillRect(x-s,y-s*.18,s*2,s*.36); c.shadowBlur=0;
+    }
+    draw();
+})();
+
+// ── ONDA DE FONDO (CHAT) ───────────────────────────────────────────
+const wCanvas = document.getElementById('canvasOnda');
+const wCtx    = wCanvas.getContext('2d');
+let wFase=0, wActivo=false;
+
+function resizeWave(){
+    wCanvas.width  = wCanvas.offsetWidth  || wCanvas.parentElement.offsetWidth;
+    wCanvas.height = wCanvas.offsetHeight || wCanvas.parentElement.offsetHeight;
+}
+window.addEventListener('resize', resizeWave);
+resizeWave();
+
+(function waveLoop(){
+    wCtx.clearRect(0,0,wCanvas.width,wCanvas.height);
+    const amp = wActivo ? 55 : 22;
+    const vel = wActivo ? .055 : .025;
+    wFase += vel;
+    ['rgba(74,158,255,.16)','rgba(74,158,255,.08)','rgba(120,190,255,.05)','rgba(30,100,200,.11)']
+        .forEach((col,i)=>{
+            wCtx.beginPath();
+            wCtx.lineWidth = i===0?2:1;
+            wCtx.strokeStyle = col;
+            const my = wCanvas.height/2;
+            for(let x=0;x<=wCanvas.width;x++){
+                const env = Math.sin((x/wCanvas.width)*Math.PI);
+                const y   = my + Math.sin(x*(i*.5+1)*.007 + wFase + i)*amp*env;
+                x===0 ? wCtx.moveTo(x,y) : wCtx.lineTo(x,y);
+            }
+            wCtx.stroke();
+        });
+    requestAnimationFrame(waveLoop);
+})();
+
+// ── ESTADO ─────────────────────────────────────────────────────────
+async function actualizarStatus(){
+    try {
+        const r = await apiFetch('/api/status');
+        const dot = document.getElementById('statusDot');
+        document.getElementById('statusTexto').textContent = r.online ? 'En línea' : 'Sin conexión';
+        dot.className = 'status-dot' + (r.online ? ' online' : '');
+        document.getElementById('proveedorBadge').textContent =
+            (r.online ? r.proveedor : 'ollama local').toUpperCase();
+    } catch {
+        document.getElementById('statusTexto').textContent = 'Servidor offline';
+        document.getElementById('statusDot').className = 'status-dot';
+    }
+}
+setInterval(actualizarStatus, 8000);
+actualizarStatus();
+
+// Reloj
+setInterval(()=>{
+    document.getElementById('headerHora').textContent =
+        new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'});
+}, 1000);
+
+// ── FETCH HELPER ───────────────────────────────────────────────────
+async function apiFetch(path, opts={}){
+    const url = BASE_URL + path;
+    opts.headers = { 'Content-Type':'application/json', ...(opts.headers||{}) };
+    const r = await fetch(url, opts);
+    if(!r.ok) throw new Error(await r.text());
+    return r.json();
+}
+
+// ── NAVEGACIÓN ─────────────────────────────────────────────────────
+const vistas = {
+    vistaChat:    'CONVERSACIÓN',
+    vistaMemoria: 'MEMORIA',
+    vistaBusqueda:'BÚSQUEDA WEB',
+    vistaControl: 'CONTROL',
+    vistaConfig:  'CONFIGURACIÓN'
+};
+
+document.querySelectorAll('.nav-item').forEach(item=>{
+    item.addEventListener('click', ()=>{
+        const id = item.dataset.vista;
+        document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+        document.querySelectorAll('.vista').forEach(v=>v.classList.remove('activa'));
+        item.classList.add('active');
+        document.getElementById(id).classList.add('activa');
+        document.getElementById('headerTitle').textContent = vistas[id]||'';
+        if(id==='vistaMemoria') cargarMemoria();
+        if(id==='vistaConfig')  cargarConfig();
+        cerrarSidebar();
+    });
+});
+
+function abrirSidebar(){
+    document.getElementById('sidebar').classList.add('open');
+    document.getElementById('overlay').classList.add('visible');
+}
+function cerrarSidebar(){
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('overlay').classList.remove('visible');
+}
+
+// ── HISTORIAL LOCAL (OFFLINE QUEUE) ───────────────────────────────
+let colaOffline = JSON.parse(localStorage.getItem('alma_cola')||'[]');
+
+function guardarCola(peticion, respuesta){
+    colaOffline.push({peticion, respuesta, ts: new Date().toISOString()});
+    localStorage.setItem('alma_cola', JSON.stringify(colaOffline.slice(-50)));
+}
+
+// ── CHAT ───────────────────────────────────────────────────────────
+const contenedor = document.getElementById('mensajes');
+
+function addBurbuja(rol, texto, meta={}){
+    const div = document.createElement('div');
+    div.className = `burbuja ${rol}`;
+    div.textContent = texto;
+    if(rol === 'alma'){
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'burbuja-meta';
+        const prov = meta.proveedor||'ollama';
+        metaDiv.innerHTML =
+            `<span class="badge ${prov.split('_')[0]}">${prov.toUpperCase()}</span>` +
+            (meta.web_usada ? '<span class="badge web">🌐 web</span>' : '') +
+            (meta.memoria_usada ? '<span class="badge mem">🧠 mem</span>' : '') +
+            `<span>${meta.timestamp||''}</span>`;
+        div.appendChild(metaDiv);
+    }
+    contenedor.appendChild(div);
+    contenedor.scrollTop = contenedor.scrollHeight;
+    return div;
+}
+
+function addTyping(){
+    const d = document.createElement('div');
+    d.className = 'typing'; d.id = 'typing';
+    d.innerHTML = '<span></span><span></span><span></span>';
+    contenedor.appendChild(d);
+    contenedor.scrollTop = contenedor.scrollHeight;
+}
+function removeTyping(){ document.getElementById('typing')?.remove(); }
+
+async function enviarMensaje(){
+    const inp = document.getElementById('inputMsg');
+    const msg = inp.value.trim();
+    if(!msg) return;
+    inp.value = '';
+    document.getElementById('btnSend').disabled = true;
+    wActivo = true;
+
+    addBurbuja('user', msg);
+    addTyping();
+
+    // Guardar en cola offline primero
+    try {
+        const res = await apiFetch('/api/chat', {
+            method:'POST',
+            body: JSON.stringify({
+                mensaje: msg,
+                pantalla: capturarPantallaPendiente,
+                proveedor: null
+            })
+        });
+        removeTyping();
+        addBurbuja('alma', res.respuesta, res);
+        if(!res.online) guardarCola(msg, res.respuesta);
+        if(res.sincronizados > 0)
+            addBurbuja('alma', `📡 ${res.sincronizados} mensaje(s) sincronizado(s) desde offline.`, {proveedor:'sistema'});
+    } catch(e) {
+        removeTyping();
+        // Respuesta offline local (sin servidor Flask)
+        const fallback = buscarRespuestaLocal(msg);
+        addBurbuja('alma', fallback, {proveedor:'local_offline'});
+        guardarCola(msg, fallback);
+    }
+
+    capturarPantallaPendiente = false;
+    document.getElementById('btnSend').disabled = false;
+    document.getElementById('btnPantalla').style.color = '';
+    wActivo = false;
+}
+
+function buscarRespuestaLocal(msg){
+    // Respuesta básica cuando ni el servidor está disponible
+    const q = msg.toLowerCase();
+    if(q.includes('hola')||q.includes('buenos')) return '¡Hola! Estoy en modo offline. El servidor Flask no responde, pero puedo recordarte que revises tu Dropbox cuando tengas conexión.';
+    if(q.includes('hora')||q.includes('tiempo')) return `Son las ${new Date().toLocaleTimeString('es-CL')}.`;
+    return '⚠ Servidor no disponible. Asegúrate de que alma.py esté corriendo. Tu mensaje quedó guardado en la cola offline.';
+}
+
+// Cargar historial previo al iniciar
+(async ()=>{
+    try {
+        const rows = await apiFetch('/api/historial?limite=20');
+        if(rows.length === 0){
+            addBurbuja('alma','Hola, soy AL.MA. Estoy lista para asistirte. ¿En qué puedo ayudarte?', {proveedor:'sistema'});
+        } else {
+            rows.forEach(r => addBurbuja(r.rol==='user'?'user':'alma', r.mensaje,
+                r.rol==='assistant' ? {proveedor:'historial', timestamp: r.timestamp} : {}));
+        }
+    } catch {
+        addBurbuja('alma','Hola, soy AL.MA. (Servidor offline — modo limitado activo)', {proveedor:'local_offline'});
+    }
+})();
+
+// Eventos
+document.getElementById('btnSend').addEventListener('click', enviarMensaje);
+document.getElementById('inputMsg').addEventListener('keydown', e=>{ if(e.key==='Enter') enviarMensaje(); });
+document.getElementById('btnMic').addEventListener('click', ()=>{ wActivo=!wActivo; });
+document.getElementById('btnPantalla').addEventListener('click', ()=>{
+    capturarPantallaPendiente = !capturarPantallaPendiente;
+    document.getElementById('btnPantalla').style.color = capturarPantallaPendiente ? 'var(--verde)' : '';
+    document.getElementById('inputMsg').placeholder = capturarPantallaPendiente
+        ? '📷 La próxima petición incluirá captura de pantalla...'
+        : 'Escribe un mensaje...';
+});
+
+// ── MEMORIA ─────────────────────────────────────────────────────────
+async function cargarMemoria(){
+    const grid = document.getElementById('memGrid');
+    grid.innerHTML = '<div style="color:var(--texto2);text-align:center;padding:30px">Cargando...</div>';
+    try {
+        const rows = await apiFetch('/api/memoria');
+        renderMemoria(rows);
+    } catch { grid.innerHTML = '<div style="color:var(--rojo);text-align:center;padding:30px">Error al cargar (¿servidor corriendo?)</div>'; }
+}
+
+function renderMemoria(rows){
+    const grid = document.getElementById('memGrid');
+    if(!rows.length){ grid.innerHTML='<div style="color:var(--texto2);text-align:center;padding:30px">Sin registros todavía.</div>'; return; }
+    grid.innerHTML = rows.map(r=>`
+        <div class="mem-card">
+            <div class="mem-card-body">
+                <div class="mem-clave">${r.clave}</div>
+                <div class="mem-contenido">${r.contenido}</div>
+                <div class="mem-fecha">${r.fecha||''}</div>
+            </div>
+            <button class="btn-del" onclick="eliminarMemoria('${r.clave.replace(/'/g,"\\'")}')">🗑</button>
+        </div>`).join('');
+}
+
+async function buscarEnMemoria(q){
+    if(!q){ cargarMemoria(); return; }
+    try {
+        const rows = await apiFetch(`/api/memoria/buscar?q=${encodeURIComponent(q)}`);
+        renderMemoria(rows);
+    } catch {}
+}
+
+async function agregarMemoria(){
+    const clave     = document.getElementById('memClave').value.trim();
+    const contenido = document.getElementById('memContenido').value.trim();
+    if(!clave||!contenido) return alert('Rellena clave y contenido.');
+    await apiFetch('/api/memoria',{method:'POST',body:JSON.stringify({clave,contenido})});
+    document.getElementById('memClave').value = '';
+    document.getElementById('memContenido').value = '';
+    cargarMemoria();
+}
+
+async function eliminarMemoria(clave){
+    if(!confirm(`¿Eliminar "${clave}"?`)) return;
+    await apiFetch(`/api/memoria/${encodeURIComponent(clave)}`,{method:'DELETE'});
+    cargarMemoria();
+}
+
+// ── BÚSQUEDA ────────────────────────────────────────────────────────
+async function ejecutarBusqueda(){
+    const q = document.getElementById('searchInput').value.trim();
+    if(!q) return;
+    document.getElementById('searchResultado').innerHTML =
+        '<div class="search-result" style="color:var(--texto2)">Buscando...</div>';
+    try {
+        const res = await apiFetch(`/api/buscar?q=${encodeURIComponent(q)}`);
+        document.getElementById('searchResultado').innerHTML =
+            `<div class="search-result">${res.resultado || 'Sin resultados.'}</div>`;
+    } catch(e) {
+        document.getElementById('searchResultado').innerHTML =
+            `<div class="search-result" style="color:var(--rojo)">Error: ${e.message}</div>`;
+    }
+}
+document.getElementById('searchInput').addEventListener('keydown',e=>{ if(e.key==='Enter') ejecutarBusqueda(); });
+
+// ── CONTROL ────────────────────────────────────────────────────────
+async function ejecutarControl(){
+    const accion    = document.getElementById('ctrlAccion').value;
+    const parametro = document.getElementById('ctrlParam').value.trim();
+    const log       = document.getElementById('ctrlLog');
+    log.textContent = `> Ejecutando: ${accion} ${parametro}...`;
+    try {
+        const res = await apiFetch('/api/control',{method:'POST',body:JSON.stringify({accion,parametro})});
+        log.textContent = `> ${res.resultado}`;
+        log.style.color = res.resultado.startsWith('✓') ? 'var(--verde)' : 'var(--naranja)';
+    } catch(e){ log.textContent=`> Error: ${e.message}`; log.style.color='var(--rojo)'; }
+}
+
+async function accionRapida(accion, parametro){
+    const log = document.getElementById('ctrlLog');
+    log.textContent = `> ${accion}: ${parametro}...`;
+    try {
+        const res = await apiFetch('/api/control',{method:'POST',body:JSON.stringify({accion,parametro})});
+        log.textContent = `> ${res.resultado}`;
+        log.style.color = 'var(--verde)';
+    } catch(e){ log.textContent=`> Error: ${e.message}`; log.style.color='var(--rojo)'; }
+}
+
+async function capturarPantalla(){
+    const img = document.getElementById('screenshotImg');
+    img.style.display='none';
+    try {
+        const res = await apiFetch('/api/screenshot');
+        img.src = `data:image/jpeg;base64,${res.imagen}`;
+        img.style.display='block';
+    } catch(e){ document.getElementById('ctrlLog').textContent=`> Error screenshot: ${e.message}`; }
+}
+
+// ── CONFIGURACIÓN ──────────────────────────────────────────────────
+async function cargarConfig(){
+    try {
+        const cfg = await apiFetch('/api/config');
+        document.getElementById('cfgProveedor').value  = cfg.proveedor_ia   || 'ollama';
+        document.getElementById('cfgModelo').value     = cfg.modelo_local   || 'llama3.2';
+    } catch {}
+    document.getElementById('cfgBaseUrl').value = localStorage.getItem('alma_base_url') || 'http://localhost:5000';
+}
+
+async function guardarConfig(){
+    const proveedor = document.getElementById('cfgProveedor').value;
+    const modelo    = document.getElementById('cfgModelo').value;
+    const claudeKey = document.getElementById('cfgClaudeKey').value.trim();
+    const geminiKey = document.getElementById('cfgGeminiKey').value.trim();
+    const openaiKey = document.getElementById('cfgOpenaiKey').value.trim();
+    const baseUrl   = document.getElementById('cfgBaseUrl').value.trim();
+
+    if(baseUrl){ BASE_URL = baseUrl; localStorage.setItem('alma_base_url', baseUrl); }
+
+    const payload = { proveedor_ia: proveedor, modelo_local: modelo };
+    if(claudeKey) payload.claude_api_key = claudeKey;
+    if(geminiKey) payload.gemini_api_key = geminiKey;
+    if(openaiKey) payload.openai_api_key = openaiKey;
+
+    try {
+        await apiFetch('/api/config',{method:'POST',body:JSON.stringify(payload)});
+        document.getElementById('cfgMsg').textContent = '✓ Configuración guardada correctamente';
+        setTimeout(()=>document.getElementById('cfgMsg').textContent='', 3000);
+        actualizarStatus();
+    } catch(e) {
+        document.getElementById('cfgMsg').style.color='var(--rojo)';
+        document.getElementById('cfgMsg').textContent = `Error: ${e.message}`;
+    }
+}
+</script>
+</body>
+</html>
